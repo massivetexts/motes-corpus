@@ -2,6 +2,7 @@ import pandas as pd
 import math
 import os
 import json
+from motes_corpus.modeling import MOTESCorpus
 from youtube_transcript_api import YouTubeTranscriptApi
 
 def search_youtube(youtube_api, q="children|kids|kid|teen|teens", pageToken=None, topicId=None, debug=False, order="relevance"):
@@ -227,9 +228,14 @@ def fetch_and_save_transcript(videoId, save_dir, check_exists=True):
         
 class YTCaption(object):
     
+    pre_tokenized = False
     def __init__(self, path):
-        with open(path) as f:
-            self.json = json.load(f)
+        try:
+            with open(path) as f:
+                self.json = json.load(f)
+        except json.JSONDecodeError:
+            self.json = []
+
         if not self.json:
             self.json = []
             
@@ -252,3 +258,8 @@ class YTCaption(object):
         txt = self._basic_text(drop_newline=True)
         txt = self._clean_text(txt)
         return txt
+
+
+class YTCaptionCorpus(MOTESCorpus):
+    
+    DocClass = YTCaption
