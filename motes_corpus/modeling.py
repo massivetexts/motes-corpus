@@ -164,6 +164,9 @@ def train_coocurrence_matrix(doc_word_iter, model_dict, window_size=3, context_w
         print('Final prune')
         cooc.data[cooc.data < prune_below] = 0
         cooc.eliminate_zeros()
+        
+    progress = time.time() - start
+    print("Final docs processed: {}\t time: {}s\t docs/second: {}".format(i, int(progress), int(i/progress)))
     
     return cooc
 
