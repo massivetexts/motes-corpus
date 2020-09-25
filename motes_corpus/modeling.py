@@ -78,7 +78,8 @@ def weigh_contexts(tokenids, left=True):
     return list(zip(tokenids, weights))
 
 def train_coocurrence_matrix(doc_word_iter, model_dict, window_size=3, context_weighted=True,
-                             print_every=1000, trunc_doc_at=False, size_weighted=False):
+                             print_every=1000, prune_every=False, prune_below=False, trunc_doc_at=False, size_weighted=False,
+                            fold_every=100):
     '''
     doc_word_iter: Iterator that returns raw lists of words with each step
     window_size: Size of context on each side of target
@@ -86,10 +87,15 @@ def train_coocurrence_matrix(doc_word_iter, model_dict, window_size=3, context_w
         BOW training
     size_weighted: If True, weights will be divided by size of the document. This may help account for doc
         size issues when using bags-of-words, since there's no real context.
+    fold_every: How often should an intermediate coocurrence matrix be created and folded into the main matrix (every n documents).
+        This is because the sparse matrices are constructed in COO, which is fast but requires more memory - we're collecting
+        triples of row,col,weight for each coocurrences, without summing them until the folding.
     '''
     start = time.time()
     n_words = len(model_dict)
-    cooc = sparse.lil_matrix((n_words, n_words), dtype=np.float)
+    cooc = sparse.coo_matrix((n_words, n_words), dtype=np.float)
+
+    data, row, col = [], [], []
 
     try:
         for i, words in enumerate(doc_word_iter):
@@ -113,23 +119,52 @@ def train_coocurrence_matrix(doc_word_iter, model_dict, window_size=3, context_w
                     all_weighted = weigh_contexts(left_tokenids) + weigh_contexts(right_tokenids, left=False)
                 else:
                     all_weighted = [(context_id,1) for context_id in left_tokenids+right_tokenids]
-                #print(target_i, target_id, model_dict[center_id], all_weighted)
 
                 if size_weighted:
                     all_weighted = [(c,(w/len(all_weighted))) for c,w in all_weighted]
 
                 for context_id, weight in all_weighted:
-                    cooc[target_id, context_id] += weight
-
+                    if target_id > 0 and context_id > 0:
+                        row.append(target_id)
+                        col.append(context_id)
+                        data.append(weight)
+                    
+            if i % fold_every == 0:
+                cooc_intermediate = sparse.coo_matrix((data, (row, col)), shape=(n_words, n_words))
+                cooc_intermediate.sum_duplicates()
+                cooc += cooc_intermediate
+                
+                data, row, col, cooc_intermediate = [], [], [], None
+                
             if i % print_every == 0:
                 progress = time.time() - start
                 print("Docs processed: {}\t time: {}s\t docs/second: {}".format(i, int(progress), int(i/progress)))
+                
+            if prune_every and i % prune_every == 0 and i > 0:
+                if not prune_below:
+                    print('No pruning limit set with prune_below!')
+                else:
+                    print('pruning infrequent coocurrences')
+                    before_size = len(cooc.data)
+                    cooc.data[cooc.data < prune_below] = 0
+                    cooc.eliminate_zeros()
+                    after_size = len(cooc.data)
+                    print('Reduced size from to {} to {} ({}%)'.format(before_size, after_size, int(100*(after_size/before_size))))
     except KeyboardInterrupt:
         print("Manually stopping training and return coccurrence matrix ")
         progress = time.time() - start
         print("Docs processed: {}\t time: {}s\t docs/second: {}".format(i, int(progress), int(i/progress)))
+
+    cooc_intermediate = sparse.coo_matrix((data, (row, col)), shape=(n_words, n_words))
+    cooc_intermediate.sum_duplicates()
+    cooc += cooc_intermediate
+    data, row, col, cooc_intermediate = [], [], [], None
     
-    cooc = cooc.tocoo()
+    if prune_below:
+        print('Final prune')
+        cooc.data[cooc.data < prune_below] = 0
+        cooc.eliminate_zeros()
+    
     return cooc
 
 
