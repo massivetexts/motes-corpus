@@ -33,6 +33,7 @@ def main():
     wikicooc = modeling.train_coocurrence_matrix(skip_texts(args.skip_count, args.max_docs), model_dict,
                                                  window_size=10, print_every=5000, prune_every=args.prune_every, 
                                                  prune_below=args.prune_below, fold_every=args.fold_every)
+    print("Building complete. Saving matrix")
     sparse.save_npz(args.outpath, wikicooc)
     
 if __name__ == "__main__":
