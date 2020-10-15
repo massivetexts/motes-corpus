@@ -28,6 +28,7 @@ def main():
             else:
                 yield text
             if max and ((i-n) >= max):
+                print("Text generator ended with {} texts".format(i))
                 return
 
     wikicooc = modeling.train_coocurrence_matrix(skip_texts(args.skip_count, args.max_docs), model_dict,
