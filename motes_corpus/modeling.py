@@ -260,27 +260,25 @@ class ModelCompare(object):
     
     def _truncate_keyedvectors(self, kv, include_list):
         ''' Truncate a KeyedVectors word embedding model to a given vocabulary'''
-        new_vocab = OrderedDict()
+        new_vocab = dict()
         include_dims = []
 
         for i, word in enumerate(include_list):
-            vocab_item = gensim.models.keyedvectors.Vocab()
-            include_dims.append(kv.vocab[word].index)
-            vocab_item.index = i
-            new_vocab[word] = vocab_item
+            include_dims.append(kv.key_to_index[word])
+            new_vocab[word] = i
 
         new_kv = gensim.models.keyedvectors.KeyedVectors(len(new_vocab))
-        new_kv.vocab = new_vocab
-        new_kv.index2word = list(new_vocab.keys())
+        new_kv.key_to_index = new_vocab
+        new_kv.index_to_key = list(new_vocab.keys())
         new_kv.vectors = kv.vectors[include_dims]
         return new_kv
     
     def scores(self, k=1000, break_at=False, force=False):
         ''' Score words. Caches, so if you change k, remember to force recalculation'''
-        if (len(self._scores) == len(self.target.vocab.keys())) and not force:
+        if (len(self._scores) == len(self.target)) and not force:
             return pd.Series(self._scores)
         
-        for i, q in enumerate(self.target.vocab.keys()):
+        for i, q in enumerate(self.target.key_to_index.keys()):
             if (q not in self._scores) or force:
                 score = self.get_intersect_score(q, k=k)
                 self._scores[q] = score
