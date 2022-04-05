@@ -16,7 +16,7 @@ class MOTESCorpus(object):
         self._stats = None
         
         nlp = English()
-        self.tokenizer = nlp.Defaults.create_tokenizer(nlp)
+        self.tokenizer = nlp.tokenizer
         
     def docs(self):
         for path in self.paths:
